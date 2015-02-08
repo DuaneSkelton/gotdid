@@ -1,8 +1,15 @@
+
 import sys
 import json
 import os
 
 gotdidData =  { 'counter':0, 'dids':[] }
+
+def makeEntry(status,desc):
+    global gotdidData
+    gotdidData['counter'] = gotdidData['counter'] + 1
+    did = { 'status':status, 'id':gotdidData['counter'], 'desc' : desc }
+    return did
 
 def findFile():
     filename = os.path.abspath(os.path.join(os.getcwd(), '.gotdid'))
@@ -48,9 +55,18 @@ def doCommand(options):
         return False
     filename = findFile()
     if readFile(filename):
-        gotdidData['counter'] = gotdidData['counter'] + 1
-        did = { 'status':'do', 'id':gotdidData['counter'], 'todo' : options[0] }
-        gotdidData['dids'].append(did)
+        gotdidData['dids'].append(makeEntry('do',options[0]))
+        writeFile(filename)
+    return True
+
+def winCommand(options):
+    print 'win'
+    if len(options) != 1:
+        print 'error - win requires an option with the win text'
+        return False
+    filename = findFile()
+    if readFile(filename):
+        gotdidData['dids'].append(makeEntry('win',options[0]))
         writeFile(filename)
     return True
 
@@ -65,7 +81,7 @@ def didCommand(options):
         print '%d is getting did' % i
         #global gotdidData
         for d in gotdidData['dids']:
-            if i == d['id']:
+            if i == d['id'] and d['status'] == 'do':
                 d['status'] = 'did'
                 writeFile(filename)
                 return True
@@ -82,11 +98,11 @@ def undidCommand(options):
         i = int(options[0])
         print '%d is getting undid' % i
         for d in gotdidData['dids']:
-            if i == d['id']:
+            if i == d['id'] and d['status'] == 'did':
                 d['status'] = 'do'
                 writeFile(filename)
                 return True
-        print "can't did %d - id not found" % i
+        print "can't undid %d - id not found" % i
     return False
 
 def gtfoCommand(options):
@@ -100,28 +116,42 @@ def gtfoCommand(options):
         print '%d is getting tfo' % i
         for d in gotdidData['dids']:
             if i == d['id']:
-                d['status'] = 'do'
                 gotdidData['dids'].remove(d)
                 writeFile(filename)
                 return True
-        print "can't did %d - id not found" % i
+        print "can't gtfo %d - id not found" % i
     return False
+
+def printEntry(entry):
+    print '%d %s %s' % (entry['id'], entry['status'], entry['desc'])
 
 def wutCommand(options):
     print 'wut'
     filename = findFile()
     if readFile(filename):
         filter = ""
+
+        # See what the options are
         if len(options) == 1:
             filter = options[0]
-        if filter != 'did':
-            for d in gotdidData['dids']:
+
+        # Show do elements first
+        if filter == 'do' or filter == '':
+             for d in gotdidData['dids']:
                 if d['status'] == 'do':
-                    print '%d %s %s' % (d['id'], d['status'], d['todo'])
-        if filter != 'do':
+                    printEntry(d)
+        
+        # Show dids
+        if filter == 'did' or filter == '':
             for d in gotdidData['dids']:
                 if d['status'] == 'did':
-                    print '%d %s %s' % (d['id'], d['status'], d['todo'])
+                    printEntry(d)        
+        
+        # Show wins
+        if filter == 'win' or filter == '':
+            for d in gotdidData['dids']:
+                if d['status'] == 'win':
+                    printEntry(d)
     return True
 
 def mergeCommand(options):
@@ -145,10 +175,11 @@ def mergeCommand(options):
     if len(sourceData['dids']) > 0:
         for d in sourceData['dids']:
             destData['counter'] = destData['counter'] + 1
-            did = { 'id':destData['counter'], 'status':d['status'], 'todo':d['todo'] }
+            did = { 'id':destData['counter'], 'status':d['status'], 'desc':d['desc'] }
             destData['dids'].append(did)
         writeFile(filename)
     return True
+
 
 def usage():
     us = '\ngotdid command options\n' \
@@ -157,6 +188,8 @@ def usage():
          '            gotdid do "The stuff to do"\n' \
          'did     - mark a todo did using the id from wut\n' \
          '            gotdid did <id>\n' \
+         'win     - add something that you just did without knowin it needed did\n' \
+         '            gotdid win "fixed the make file that was broken forever"\n' \
          'undid   - mark a todo back to do using the id from wut\n' \
          '            gotdid undid <id>\n' \
          'gtfo    - delete an item from the list using the id from wut\n' \
@@ -184,6 +217,9 @@ def main():
                 print usage()
         elif command == 'do':
             if not doCommand(opts):
+                print usage()
+        elif command == 'win':
+            if not winCommand(opts):
                 print usage()
         elif command == 'did':
             if not didCommand(opts):
